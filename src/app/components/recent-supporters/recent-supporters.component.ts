@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 
 @Component({
   selector: 'app-recent-supporters',
@@ -15,6 +15,10 @@ export class RecentSupportersComponent implements OnInit {
 
   ngOnInit() {
     this.mostRecentFollower = 'Eeveecario';
+  }
+
+  @HostListener('mouseenter') onMouseEnter() {
+    this.mostRecentFollower = 'Enrique Enciso';
   }
 
 }

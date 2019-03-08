@@ -1,22 +1,28 @@
-import { Directive, ElementRef, HostListener, Input, OnInit } from '@angular/core';
+import { Directive, ElementRef, HostListener, Input, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 
 @Directive({
   selector: '[appWordShuffler]'
 })
-export class WordShufflerDirective implements OnInit {
+export class WordShufflerDirective implements OnInit, OnChanges {
 
   @Input('appWordShuffler') currentName: string;
   @Input() color: string;
 
+  currentNameAsArray: string[] = [];
   previousName: string;
-  now: Date;
-  then: Date;
+  now: number;
+  then: number = Date.now();
+  time = 0;
+  currentTimeOffset = 0;
+  currentCharacter = 0;
+  currentWordLength = 0;
+  needsUpdate = true;
   options = {
     fps: 30,
-    timeOffset: 5,
+    timeOffset: 10,
     mixCapital : true,
+    interval: 1000 / 24, // default interval
     mixSpecialCharacters : true,
-    needUpdate : true,
     colors : [
       '#f44336', '#e91e63', '#9c27b0',
       '#673ab7', '#3f51b5', '#2196f3',
@@ -34,38 +40,84 @@ export class WordShufflerDirective implements OnInit {
     'M', 'N', 'O', 'P',
     'Q', 'R', 'S', 'T',
     'U', 'V', 'W', 'X',
-    'Y', 'Z',
+    'Y', 'Z', '0', '1',
+    '2', '3', '4', '5',
+    '6', '7', '8', '9',
+    '_',
   ];
   specialCharacters = [
     '!', '§', '$', '%',
     '&', '/', '(', ')',
-    '=', '?', '_', '<',
+    '=', '?', '<', '~',
     '>', '^', '°', '*',
-    '#', '-', ':', ';', '~',
+    '#', '-', ':', ';',
   ];
 
   constructor(private el: ElementRef) {
-    // el.nativeElement.innerHTML = this.currentName || 'Not defined!';
+    if (this.options.mixSpecialCharacters) {
+      this.chars = this.chars.concat(this.specialCharacters);
+    }
+    this.options.interval = 1000 / this.options.fps;
   }
 
   ngOnInit() {
-    // console.log(this.specialCharacters);
-    if (this.options.mixSpecialCharacters) {
-      this.chars.concat(this.specialCharacters);
-    }
-    this.wordShuffler();
+    this.writeWord(this.currentName);
+    this.update(this.time);
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+     if (changes.currentName) {
+       this.setCurrentName(changes.currentName.currentValue);
+     }
   }
 
   setCurrentName(name: string) {
-    this.currentName = name;
+    this.writeWord(name);
+    this.restart();
   }
 
-  @HostListener('mouseenter') onMouseEnter() {
-    this.wordShuffler();
-  }
+  private wordShuffler(time: number) {
+    this.now = Date.now();
+    const delta = this.now - this.then;
+    this.options.interval = 1000 / this.options.fps;
 
-  wordShuffler(name?: string) {
+    if (delta > this.options.interval) {
+      this.currentTimeOffset++;
 
+      const word = [];
+      if (this.currentTimeOffset === this.options.timeOffset &&
+          this.currentCharacter !== this.currentWordLength) {
+        this.currentCharacter++;
+        this.currentTimeOffset = 0;
+      }
+
+      for (let i = 0; i < this.currentCharacter; i++) {
+        word.push(this.currentName[i]);
+      }
+
+      for (let i = 0; i < this.currentWordLength - this.currentCharacter; i++) {
+        if (this.currentName[this.currentCharacter + i] !== ' ') {
+          word.push(this.getRandomCharacter(this.currentName[this.currentCharacter + i]));
+        }
+      }
+
+      if (this.currentCharacter === this.currentWordLength) {
+        this.needsUpdate = false;
+      }
+      this.el.nativeElement.innerHTML = '';
+      word.forEach((character, index) => {
+        let color = null;
+        if (index > this.currentCharacter) {
+          color = this.getRandomColor();
+        } else {
+          color = 'inherit';
+        }
+
+        this.el.nativeElement.appendChild(this.generateSingleCharacter(color, character));
+      });
+
+      this.then = this.now - (delta % this.options.interval);
+    }
   }
 
   private getRandomColor(): string {
@@ -74,11 +126,6 @@ export class WordShufflerDirective implements OnInit {
   }
 
   private getRandomCharacter(characterToReplace: string): string {
-    // Move this validation to main function
-    if (characterToReplace === ' ') {
-      return ' ';
-    }
-
     const randomNum = Math.floor(Math.random() * this.chars.length);
     let pickedChar = this.chars[randomNum];
     if (this.options.mixCapital) {
@@ -91,8 +138,28 @@ export class WordShufflerDirective implements OnInit {
   private generateSingleCharacter(color: string, character: string): HTMLElement {
     const span = document.createElement('span');
     span.style.color = color;
+    span.classList.add('decoded');
     span.innerHTML = character;
     return span;
+  }
+
+  private writeWord(word: string) {
+    this.currentName = word;
+    this.currentNameAsArray = word.split('');
+    this.currentWordLength = word.length;
+  }
+
+  private restart() {
+    this.currentCharacter = 0;
+    this.needsUpdate = true;
+  }
+
+  update = (time: number) => {
+    this.time++;
+    if (this.needsUpdate) {
+      this.wordShuffler(time);
+    }
+    requestAnimationFrame(this.update);
   }
 
 }
